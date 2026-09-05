@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { Camera, Video, Settings, AlertCircle } from 'lucide-react';
+import { Camera, Video, Settings, AlertCircle, Maximize, Monitor } from 'lucide-react';
 
 interface ResolutionConfig {
   label: string;
@@ -24,13 +24,23 @@ const configs: Record<string, ResolutionConfig> = {
   '720p144': { label: '720p @ 144fps', width: 1280, height: 720, frameRate: 144 },
 };
 
+const filters: Record<string, string> = {
+  'Original': 'brightness(1)',
+  'Bright': 'brightness(1.5)',
+  'Device Quality': 'contrast(1.2) brightness(1.1) saturate(1.1)',
+  'Shadowed': 'brightness(0.7) contrast(1.1)',
+  'More Lighting': 'brightness(1.2) contrast(1.1)',
+};
+
 export default function App() {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [selectedConfig, setSelectedConfig] = useState<string>('1080p120');
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<string>('Original');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function getDevices() {
@@ -71,6 +81,14 @@ export default function App() {
     }
   };
 
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      videoContainerRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] p-4 text-[#e0e0e0] font-sans">
       <header className="flex items-center justify-between px-6 py-3 bg-[#111] border-b border-[#222] mb-6">
@@ -101,6 +119,21 @@ export default function App() {
               {Object.entries(configs).map(([key, config]) => <option key={key} value={key}>{config.label}</option>)}
             </select>
           </div>
+
+          <div className="bg-[#0f0f0f] p-4 rounded border border-[#222]">
+            <label className="text-[10px] uppercase font-bold text-[#666] mb-2 tracking-widest block">Filter</label>
+            <div className="grid grid-cols-2 gap-2">
+                {Object.keys(filters).map(filterName => (
+                    <button 
+                        key={filterName}
+                        onClick={() => setActiveFilter(filterName)}
+                        className={`text-[10px] font-bold py-1.5 rounded border ${activeFilter === filterName ? 'bg-[#00ffcc] text-black border-[#00ffcc]' : 'bg-[#222] text-[#888] border-[#333] hover:bg-[#333]'}`}
+                    >
+                        {filterName}
+                    </button>
+                ))}
+            </div>
+          </div>
           
           <button 
             onClick={startStream}
@@ -110,13 +143,27 @@ export default function App() {
           </button>
         </div>
         
-        <div className="md:col-span-3 bg-black rounded border border-[#222] aspect-video flex items-center justify-center relative overflow-hidden">
+        <div ref={videoContainerRef} className="md:col-span-3 bg-black rounded border border-[#222] aspect-video flex items-center justify-center relative overflow-hidden">
+          <button 
+            onClick={toggleFullScreen}
+            className="absolute top-4 right-4 z-10 bg-black/50 p-2 rounded text-white hover:bg-black/80"
+          >
+            <Maximize size={20} />
+          </button>
+          
           {error ? (
             <div className="text-red-500 flex items-center gap-2">
               <AlertCircle /> {error}
             </div>
           ) : stream ? (
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
+            <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted 
+                className="w-full h-full object-contain" 
+                style={{ filter: filters[activeFilter] }}
+            />
           ) : (
             <div className="text-[#555] flex flex-col items-center">
               <Video size={48} className="mb-2" />
