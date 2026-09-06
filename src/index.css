@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+/* Custom High-Density Studio Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #0d0d0d;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #262626;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #00ffcc44;
+}
+
+/* 144 FPS Optical Flow / Frame Generation Smooth Filter */
+.motion-smooth-144 {
+  image-rendering: high-quality;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform, filter;
+}

@@ -1,177 +1,288 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import { useState, useEffect, useRef } from 'react';
-import { Camera, Video, Settings, AlertCircle, Maximize, Monitor } from 'lucide-react';
-
-interface ResolutionConfig {
-  label: string;
-  width: number;
-  height: number;
-  frameRate: number;
-}
-
-const configs: Record<string, ResolutionConfig> = {
-  '4k60': { label: '4K @ 60fps', width: 3840, height: 2160, frameRate: 60 },
-  '1080p120': { label: '1080p @ 120fps', width: 1920, height: 1080, frameRate: 120 },
-  '720p144': { label: '720p @ 144fps', width: 1280, height: 720, frameRate: 144 },
-};
-
-const filters: Record<string, string> = {
-  'Original': 'brightness(1)',
-  'Bright': 'brightness(1.5)',
-  'Device Quality': 'contrast(1.2) brightness(1.1) saturate(1.1)',
-  'Shadowed': 'brightness(0.7) contrast(1.1)',
-  'More Lighting': 'brightness(1.2) contrast(1.1)',
-};
+import React, { useState, useEffect, useCallback } from 'react';
+import { ConsoleType, FilterPresetKey, PerformanceSettings, ResolutionPresetKey } from './types';
+import {
+  CONSOLE_PROFILES,
+  DEFAULT_CUSTOM_FILTERS,
+  DEFAULT_PERFORMANCE_SETTINGS,
+  RESOLUTION_PRESETS,
+} from './constants/presets';
+import { useDeviceDetector } from './hooks/useDeviceDetector';
+import { useAudioMonitor } from './hooks/useAudioMonitor';
+import { useCaptureStream } from './hooks/useCaptureStream';
+import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
+import { VideoPlayer } from './components/VideoPlayer';
+import { DeviceDetectorModal } from './components/DeviceDetectorModal';
+import { RemotePlayGuideModal } from './components/RemotePlayGuideModal';
+import { Usb, X } from 'lucide-react';
 
 export default function App() {
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [selectedConfig, setSelectedConfig] = useState<string>('1080p120');
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<string>('Original');
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const [selectedConsole, setSelectedConsole] = useState<ConsoleType>('auto');
+  const [selectedPreset, setSelectedPreset] = useState<ResolutionPresetKey>('1080p120');
+  const [activeFilter, setActiveFilter] = useState<FilterPresetKey>('device_quality');
+  const [customFilterSettings, setCustomFilterSettings] = useState(DEFAULT_CUSTOM_FILTERS);
 
-  useEffect(() => {
-    async function getDevices() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        stream.getTracks().forEach(track => track.stop());
-        const allDevices = await navigator.mediaDevices.enumerateDevices();
-        setDevices(allDevices.filter(d => d.kind === 'videoinput'));
-      } catch (err) {
-        setError('Failed to access camera. Please allow permissions.');
+  // Performance & Latency Tuning Settings
+  const [performanceSettings, setPerformanceSettings] = useState<PerformanceSettings>(
+    DEFAULT_PERFORMANCE_SETTINGS
+  );
+
+  const handleUpdatePerformanceSettings = useCallback(
+    (newSettings: Partial<PerformanceSettings>) => {
+      setPerformanceSettings((prev) => ({
+        ...prev,
+        ...newSettings,
+      }));
+    },
+    []
+  );
+
+  // Modals
+  const [isDetectorModalOpen, setIsDetectorModalOpen] = useState(false);
+  const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+
+  // Device Detector Hook
+  const {
+    videoDevices,
+    audioDevices,
+    selectedVideoDeviceId,
+    setSelectedVideoDeviceId,
+    selectedAudioDeviceId,
+    setSelectedAudioDeviceId,
+    isScanning,
+    scanDevices,
+    lastHotplugEvent,
+    clearHotplugEvent,
+    permissionError,
+  } = useDeviceDetector(selectedConsole);
+
+  // Web Audio Monitor Hook
+  const {
+    isAudioMuted,
+    toggleMute,
+    audioVolume,
+    setAudioVolume,
+    audioDelayMs,
+    setAudioDelayMs,
+    vuLevels,
+    isAudioActive,
+    attachAudioStream,
+  } = useAudioMonitor();
+
+  // Video & Stream Capture Hook
+  const {
+    stream,
+    sourceMode,
+    isActive,
+    isLoading,
+    error,
+    telemetry,
+    recordingState,
+    videoElementRef,
+    startDeviceCapture,
+    startRemotePlayCapture,
+    stopStream,
+    captureSnapshot,
+    startRecording,
+    stopRecording,
+  } = useCaptureStream({
+    selectedConsole,
+    selectedDeviceId: selectedVideoDeviceId,
+    selectedAudioDeviceId: selectedAudioDeviceId,
+    selectedPreset,
+    onAudioStreamReady: attachAudioStream,
+  });
+
+  // Handle Console Selection & Auto-select recommended preset and filter
+  const handleSelectConsole = useCallback(
+    (cType: ConsoleType) => {
+      setSelectedConsole(cType);
+      const profile = CONSOLE_PROFILES[cType];
+      if (profile) {
+        setSelectedPreset(profile.defaultPreset);
+        setActiveFilter(profile.recommendedFilter);
       }
-    }
-    getDevices();
-  }, []);
+    },
+    []
+  );
 
-  const startStream = async () => {
-    if (stream) stream.getTracks().forEach(track => track.stop());
-    
-    const config = configs[selectedConfig];
-    const constraints = {
-      video: {
-        deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
-        width: { ideal: config.width },
-        height: { ideal: config.height },
-        frameRate: { ideal: config.frameRate },
-      },
+  // Keyboard Shortcuts Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+
+      if (e.key === 'f' || e.key === 'F') {
+        const vidElem = videoElementRef.current?.parentElement;
+        if (vidElem) {
+          if (!document.fullscreenElement) {
+            vidElem.requestFullscreen().catch(() => {});
+          } else {
+            document.exitFullscreen().catch(() => {});
+          }
+        }
+      } else if (e.key === 'm' || e.key === 'M') {
+        toggleMute();
+      } else if (e.key === 's' || e.key === 'S') {
+        if (isActive) captureSnapshot('png');
+      } else if (e.key === 'd' || e.key === 'D') {
+        handleUpdatePerformanceSettings({
+          showLatencyDiagnostic: !performanceSettings.showLatencyDiagnostic,
+        });
+      } else if (e.key === 'r' || e.key === 'R') {
+        if (isActive) {
+          if (recordingState.isRecording) stopRecording();
+          else startRecording(25);
+        }
+      }
     };
 
-    try {
-      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(newStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = newStream;
-      }
-      setError(null);
-    } catch (err) {
-      setError('Failed to start stream with selected settings.');
-    }
-  };
-
-  const toggleFullScreen = () => {
-    if (!document.fullscreenElement) {
-      videoContainerRef.current?.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    isActive,
+    captureSnapshot,
+    recordingState.isRecording,
+    startRecording,
+    stopRecording,
+    toggleMute,
+    videoElementRef,
+    performanceSettings.showLatencyDiagnostic,
+    handleUpdatePerformanceSettings,
+  ]);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] p-4 text-[#e0e0e0] font-sans">
-      <header className="flex items-center justify-between px-6 py-3 bg-[#111] border-b border-[#222] mb-6">
-        <h1 className="text-sm font-bold tracking-widest uppercase text-white">zerozonecapturedevice</h1>
-      </header>
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="md:col-span-1 space-y-4">
-          <div className="bg-[#0f0f0f] p-4 rounded border border-[#222]">
-            <label className="text-[10px] uppercase font-bold text-[#666] mb-2 tracking-widest block">Device</label>
-            <select 
-              className="bg-[#1a1a1a] text-xs font-medium focus:outline-none cursor-pointer text-[#00ffcc] w-full p-2 rounded border border-[#333]"
-              value={selectedDeviceId}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
-            >
-              <option value="">Select a device</option>
-              {devices.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${d.deviceId.slice(0,5)}`}</option>)}
-            </select>
-          </div>
-          
-          <div className="bg-[#0f0f0f] p-4 rounded border border-[#222]">
-            <label className="text-[10px] uppercase font-bold text-[#666] mb-2 tracking-widest block">Resolution/FPS</label>
-            <select 
-              className="bg-[#1a1a1a] text-xs font-medium focus:outline-none cursor-pointer text-[#00ffcc] w-full p-2 rounded border border-[#333]"
-              value={selectedConfig}
-              onChange={(e) => setSelectedConfig(e.target.value)}
-            >
-              {Object.entries(configs).map(([key, config]) => <option key={key} value={key}>{config.label}</option>)}
-            </select>
-          </div>
+    <div className="flex flex-col h-screen w-screen bg-[#0a0a0a] text-[#e0e0e0] font-sans overflow-hidden select-none">
+      {/* Top Header */}
+      <Header
+        selectedConsole={selectedConsole}
+        telemetry={telemetry}
+        performanceSettings={performanceSettings}
+        onUpdatePerformanceSettings={handleUpdatePerformanceSettings}
+        isActive={isActive}
+        sourceMode={sourceMode}
+        detectedDevicesCount={videoDevices.length}
+        onOpenDetectorModal={() => setIsDetectorModalOpen(true)}
+        onOpenGuideModal={() => setIsGuideModalOpen(true)}
+        onRescan={() => scanDevices(true)}
+        isScanning={isScanning}
+      />
 
-          <div className="bg-[#0f0f0f] p-4 rounded border border-[#222]">
-            <label className="text-[10px] uppercase font-bold text-[#666] mb-2 tracking-widest block">Filter</label>
-            <div className="grid grid-cols-2 gap-2">
-                {Object.keys(filters).map(filterName => (
-                    <button 
-                        key={filterName}
-                        onClick={() => setActiveFilter(filterName)}
-                        className={`text-[10px] font-bold py-1.5 rounded border ${activeFilter === filterName ? 'bg-[#00ffcc] text-black border-[#00ffcc]' : 'bg-[#222] text-[#888] border-[#333] hover:bg-[#333]'}`}
-                    >
-                        {filterName}
-                    </button>
-                ))}
-            </div>
-          </div>
-          
-          <button 
-            onClick={startStream}
-            className="w-full bg-[#00ffcc] text-black text-xs font-bold py-2 rounded shadow-[0_0_10px_rgba(0,255,204,0.3)] hover:bg-[#00e6b8] transition-colors"
-          >
-            Start Capture
-          </button>
-        </div>
-        
-        <div ref={videoContainerRef} className="md:col-span-3 bg-black rounded border border-[#222] aspect-video flex items-center justify-center relative overflow-hidden">
-          <button 
-            onClick={toggleFullScreen}
-            className="absolute top-4 right-4 z-10 bg-black/50 p-2 rounded text-white hover:bg-black/80"
-          >
-            <Maximize size={20} />
-          </button>
-          
-          {error ? (
-            <div className="text-red-500 flex items-center gap-2">
-              <AlertCircle /> {error}
-            </div>
-          ) : stream ? (
-            <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                muted 
-                className="w-full h-full object-contain" 
-                style={{ filter: filters[activeFilter] }}
-            />
-          ) : (
-            <div className="text-[#555] flex flex-col items-center">
-              <Video size={48} className="mb-2" />
-              <p className="text-xs uppercase tracking-widest">No stream active</p>
-            </div>
-          )}
-        </div>
+      {/* Main Studio Body (Sidebar + Video Display Area) */}
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative">
+        {/* Left Control Sidebar */}
+        <Sidebar
+          selectedConsole={selectedConsole}
+          onSelectConsole={handleSelectConsole}
+          videoDevices={videoDevices}
+          audioDevices={audioDevices}
+          selectedVideoDeviceId={selectedVideoDeviceId}
+          onSelectVideoDevice={setSelectedVideoDeviceId}
+          selectedAudioDeviceId={selectedAudioDeviceId}
+          onSelectAudioDevice={setSelectedAudioDeviceId}
+          selectedPreset={selectedPreset}
+          onSelectPreset={setSelectedPreset}
+          activeFilter={activeFilter}
+          onSelectFilter={setActiveFilter}
+          customFilterSettings={customFilterSettings}
+          onChangeCustomFilter={setCustomFilterSettings}
+          performanceSettings={performanceSettings}
+          onUpdatePerformanceSettings={handleUpdatePerformanceSettings}
+          isActive={isActive}
+          isLoading={isLoading}
+          onStartDeviceCapture={() => startDeviceCapture()}
+          onStartRemotePlayCapture={startRemotePlayCapture}
+          onStopStream={stopStream}
+          onCaptureSnapshot={() => captureSnapshot('png')}
+          recordingState={recordingState}
+          onStartRecording={startRecording}
+          onStopRecording={stopRecording}
+          isAudioMuted={isAudioMuted}
+          onToggleAudioMute={toggleMute}
+          audioVolume={audioVolume}
+          onChangeAudioVolume={setAudioVolume}
+          audioDelayMs={audioDelayMs}
+          onChangeAudioDelay={setAudioDelayMs}
+          vuLevels={vuLevels}
+          isAudioActive={isAudioActive}
+          onRescan={() => scanDevices(true)}
+          isScanning={isScanning}
+          telemetry={telemetry}
+        />
+
+        {/* Center / Right High Performance Player Canvas */}
+        <main className="flex-1 flex flex-col h-full overflow-hidden bg-black relative">
+          <VideoPlayer
+            videoRef={videoElementRef}
+            stream={stream}
+            isActive={isActive}
+            isLoading={isLoading}
+            error={error || permissionError}
+            selectedConsole={selectedConsole}
+            activeFilter={activeFilter}
+            customFilterSettings={customFilterSettings}
+            telemetry={telemetry}
+            recordingState={recordingState}
+            performanceSettings={performanceSettings}
+            onUpdatePerformanceSettings={handleUpdatePerformanceSettings}
+            onStartDeviceCapture={() => startDeviceCapture()}
+            onStartRemotePlayCapture={startRemotePlayCapture}
+            onStopStream={stopStream}
+            onCaptureSnapshot={() => captureSnapshot('png')}
+            onStartRecording={() => startRecording(25)}
+            onStopRecording={stopRecording}
+            isAudioMuted={isAudioMuted}
+            onToggleAudioMute={toggleMute}
+          />
+        </main>
       </div>
+
+      {/* Hotplug Event Notification Toast */}
+      {lastHotplugEvent && (
+        <div className="absolute bottom-4 right-4 z-50 bg-[#161616] border border-[#00ffcc] text-white p-3 rounded-xl shadow-[0_0_20px_rgba(0,255,204,0.3)] flex items-center gap-3 font-mono animate-in slide-in-from-bottom duration-200">
+          <div className="p-2 rounded-lg bg-[#00ffcc22] text-[#00ffcc]">
+            <Usb size={16} />
+          </div>
+          <div className="text-xs">
+            <div className="font-bold text-[#00ffcc]">
+              {lastHotplugEvent.action === 'plugged'
+                ? 'HARDWARE CAPTURE DEVICE ATTACHED'
+                : 'DEVICE DISCONNECTED'}
+            </div>
+            <div className="text-[10px] text-[#aaa]">{lastHotplugEvent.deviceName}</div>
+          </div>
+          <button
+            onClick={clearHotplugEvent}
+            className="p-1 text-[#666] hover:text-white cursor-pointer ml-2"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Device Detector Modal */}
+      <DeviceDetectorModal
+        isOpen={isDetectorModalOpen}
+        onClose={() => setIsDetectorModalOpen(false)}
+        videoDevices={videoDevices}
+        audioDevices={audioDevices}
+        selectedVideoDeviceId={selectedVideoDeviceId}
+        onSelectVideoDevice={setSelectedVideoDeviceId}
+        onRescan={() => scanDevices(true)}
+        isScanning={isScanning}
+      />
+
+      {/* Remote Play & Screen Mirror Setup Guide Modal */}
+      <RemotePlayGuideModal
+        isOpen={isGuideModalOpen}
+        onClose={() => setIsGuideModalOpen(false)}
+        selectedConsole={selectedConsole}
+        onSelectConsole={handleSelectConsole}
+        onStartRemotePlayCapture={startRemotePlayCapture}
+      />
     </div>
   );
 }
