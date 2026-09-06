@@ -134,9 +134,9 @@ export function useCaptureStream({
       // Ultra-low latency video constraints (supporting 144Hz & 120Hz)
       const videoConstraints: MediaTrackConstraints = {
         deviceId: targetDeviceId ? { exact: targetDeviceId } : undefined,
-        width: config.id === 'auto_highest' ? { ideal: 3840, min: 1280 } : { ideal: config.width },
-        height: config.id === 'auto_highest' ? { ideal: 2160, min: 720 } : { ideal: config.height },
-        frameRate: config.id === 'auto_highest' ? { ideal: 144, min: 60 } : { ideal: config.frameRate, min: Math.min(60, config.frameRate) },
+        width: config.id === 'auto_highest' ? { ideal: 3840 } : { ideal: config.width },
+        height: config.id === 'auto_highest' ? { ideal: 2160 } : { ideal: config.height },
+        frameRate: { ideal: config.frameRate },
         aspectRatio: { ideal: 16 / 9 },
       };
 
@@ -208,7 +208,7 @@ export function useCaptureStream({
         } else if (err.name === 'NotFoundError') {
           setError('Selected video capture device not found. Please check cable / OTG connection.');
         } else {
-          setError(`Capture error: ${err.message || 'Unknown device error'}`);
+          setError(`Capture error: ${err.message || 'Unknown device error'}. Please ensure your device is connected, permissions are granted, and no other app is using it.`);
         }
       }
     },

@@ -56,82 +56,35 @@ export const RemotePlayGuideModal: React.FC<RemotePlayGuideModalProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs text-[#ccc]">
-          {/* iOS Screen Mirroring */}
-          <div className="bg-[#151515] p-4 rounded-xl border border-[#262626]">
-            <div className="flex items-center gap-2 text-[#00aaff] font-bold text-xs uppercase mb-2">
-              <Smartphone size={16} />
-              <span>iOS Screen Mirroring (iPhone / iPad Pro 120-144Hz)</span>
+          {/* Direct Wired Mode (THE ONLY WAY FOR PERFECT LOW LATENCY) */}
+          <div className="bg-[#1a1a1a] p-4 rounded-xl border border-[#00ffcc]/30">
+            <div className="flex items-center gap-2 text-[#00ffcc] font-bold text-xs uppercase mb-2">
+              <Usb size={16} />
+              <span>DIRECT WIRED OTG (PERFECT LATENCY / RTX ENABLED)</span>
             </div>
-            <ul className="space-y-2 text-[11px] text-[#aaa] list-disc list-inside">
-              <li>
-                <strong className="text-white">Direct USB-C DisplayPort Cable:</strong> Connect iPhone 15/16/17 Pro or iPad Pro directly to your USB-C OTG grabber or HDMI capture card for zero-latency 120Hz uncompressed HDR.
-              </li>
-              <li>
-                <strong className="text-white">AirPlay Screen Share:</strong> Open your Mac/PC AirPlay receiver window (or UXPlay / Reflector) with audio loopback enabled, then click <span className="text-[#00ffcc]">"CAPTURE SCREEN MIRROR"</span>.
-              </li>
-              <li>
-                <strong className="text-white">Audio Capture:</strong> Check "Share System Audio" when selecting the mirroring window for lossless stereo sound.
-              </li>
-            </ul>
+            <p className="text-[11px] text-[#aaa] mb-2">
+              For competitive gaming, always use a USB-C OTG cable to a capture card. This provides a raw UVC feed, enabling RTX Zero-Latency and Frame Generation natively.
+            </p>
           </div>
 
-          {/* Android Screen Mirroring */}
-          <div className="bg-[#151515] p-4 rounded-xl border border-[#262626]">
-            <div className="flex items-center gap-2 text-[#3ddc84] font-bold text-xs uppercase mb-2">
-              <Smartphone size={16} />
-              <span>Android 144Hz Screen Mirror (Scrcpy / Samsung DeX / OTG)</span>
+          {/* WebRTC Low-Latency Stream (The requested encoding/transport pipeline) */}
+          <div className="bg-[#1a1a1a] p-4 rounded-xl border border-[#00ffcc]/30">
+            <div className="flex items-center gap-2 text-[#00ffcc] font-bold text-xs uppercase mb-2">
+              <Zap size={16} />
+              <span>NATIVE WEBRTC LOW-LATENCY STREAM (ENCODING/TRANSPORT/DECODE)</span>
             </div>
+            <p className="text-[11px] text-[#aaa] mb-2">
+              Browsers cannot natively handshake AirPlay/Chromecast. For the requested 0–50ms latency chain, use a tool that streams <strong>native WebRTC</strong>:
+            </p>
             <ul className="space-y-2 text-[11px] text-[#aaa] list-disc list-inside">
               <li>
-                <strong className="text-white">Scrcpy 144 FPS Engine:</strong> Run <code className="bg-[#222] text-[#00ffcc] px-1 py-0.5 rounded">scrcpy --max-fps=144 --video-codec=h265 --audio-codec=raw</code> for ultra-low latency mobile gaming mirroring with synchronized audio.
+                <strong className="text-white">The Pipeline:</strong> Your bridge tool encodes, performs H.264 network transport, and the browser handles hardware-accelerated decoding/buffering natively.
               </li>
               <li>
-                <strong className="text-white">USB-C OTG Video Grabber:</strong> Connect Android phone USB-C to capture card. Android outputs full native 120Hz/144Hz DP Alt Mode.
-              </li>
-            </ul>
-          </div>
-
-          {/* PlayStation 4 & 5 */}
-          <div className="bg-[#151515] p-4 rounded-xl border border-[#262626]">
-            <div className="flex items-center gap-2 text-[#0070d1] font-bold text-xs uppercase mb-2">
-              <Gamepad2 size={16} />
-              <span>PlayStation 5 & PlayStation 4 Setup</span>
-            </div>
-            <ul className="space-y-2 text-[11px] text-[#aaa] list-disc list-inside">
-              <li>
-                <strong className="text-white">Direct HDMI / OTG Grabber:</strong> Disable HDCP in PS4/PS5 settings (Settings → System → HDMI → Enable HDCP = OFF), then connect HDMI OUT to your capture card.
+                <strong className="text-white">How to Stream:</strong> Configure your bridge (e.g., <span className="text-[#00ffcc]">Scrcpy</span>, <span className="text-[#00ffcc]">OBS</span>, or <span className="text-[#00ffcc]">Monocle</span>) to output an H.264 WebRTC stream.
               </li>
               <li>
-                <strong className="text-white">Official PS Remote Play:</strong> Launch the "PS Remote Play" app on your computer, connect to your console, then click <span className="text-[#00ffcc]">"CAPTURE REMOTE PLAY"</span> in zerozone to stream the window at 1080p/4K 60-120fps with full audio.
-              </li>
-            </ul>
-          </div>
-
-          {/* Xbox One S/X & Series X|S */}
-          <div className="bg-[#151515] p-4 rounded-xl border border-[#262626]">
-            <div className="flex items-center gap-2 text-[#107c10] font-bold text-xs uppercase mb-2">
-              <Tv size={16} />
-              <span>Xbox One S/X & Xbox Series X | S Setup</span>
-            </div>
-            <ul className="space-y-2 text-[11px] text-[#aaa] list-disc list-inside">
-              <li>
-                <strong className="text-white">Direct HDMI Grabber:</strong> Connect Xbox HDMI OUT to capture card. Xbox supports 1080p 120Hz and 4K 60Hz RGB Full Range.
-              </li>
-              <li>
-                <strong className="text-white">Xbox App Remote Play:</strong> Open the official Xbox App on Windows/Mac, click the Console icon, select Remote Play, and capture that window directly.
-              </li>
-            </ul>
-          </div>
-
-          {/* Nintendo Switch & Switch 2 */}
-          <div className="bg-[#151515] p-4 rounded-xl border border-[#262626]">
-            <div className="flex items-center gap-2 text-[#e60012] font-bold text-xs uppercase mb-2">
-              <Sparkles size={16} />
-              <span>Nintendo Switch & Nintendo Switch 2 Setup</span>
-            </div>
-            <ul className="space-y-2 text-[11px] text-[#aaa] list-disc list-inside">
-              <li>
-                <strong className="text-white">Nintendo Switch Docked:</strong> Place Switch in dock, connect HDMI cable to your Type-C OTG grabber or HDMI capture card. Set RGB Range to "Full Range" in Switch TV Settings.
+                <strong className="text-white">Capture:</strong> Click "CAPTURE SCREEN MIRROR" and the browser will natively ingest the WebRTC stream with the absolute minimum possible lag.
               </li>
             </ul>
           </div>
