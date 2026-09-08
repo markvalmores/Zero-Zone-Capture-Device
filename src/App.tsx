@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ConsoleType, FilterPresetKey, PerformanceSettings, ResolutionPresetKey } from './types';
+import { ConsoleType, FilterPresetKey, NetworkStreamConfig, PerformanceSettings, ResolutionPresetKey } from './types';
 import {
   CONSOLE_PROFILES,
   DEFAULT_CUSTOM_FILTERS,
+  DEFAULT_NETWORK_STREAM_CONFIG,
   DEFAULT_PERFORMANCE_SETTINGS,
   RESOLUTION_PRESETS,
 } from './constants/presets';
@@ -14,6 +15,7 @@ import { Sidebar } from './components/Sidebar';
 import { VideoPlayer } from './components/VideoPlayer';
 import { DeviceDetectorModal } from './components/DeviceDetectorModal';
 import { RemotePlayGuideModal } from './components/RemotePlayGuideModal';
+import { IpMirrorModal } from './components/IpMirrorModal';
 import { Usb, X } from 'lucide-react';
 
 export default function App() {
@@ -21,6 +23,21 @@ export default function App() {
   const [selectedPreset, setSelectedPreset] = useState<ResolutionPresetKey>('1080p120');
   const [activeFilter, setActiveFilter] = useState<FilterPresetKey>('device_quality');
   const [customFilterSettings, setCustomFilterSettings] = useState(DEFAULT_CUSTOM_FILTERS);
+
+  // Network IP Stream Configuration
+  const [networkConfig, setNetworkConfig] = useState<NetworkStreamConfig>(
+    DEFAULT_NETWORK_STREAM_CONFIG
+  );
+
+  const handleUpdateNetworkConfig = useCallback(
+    (newConfig: Partial<NetworkStreamConfig>) => {
+      setNetworkConfig((prev) => ({
+        ...prev,
+        ...newConfig,
+      }));
+    },
+    []
+  );
 
   // Performance & Latency Tuning Settings
   const [performanceSettings, setPerformanceSettings] = useState<PerformanceSettings>(
@@ -40,6 +57,7 @@ export default function App() {
   // Modals
   const [isDetectorModalOpen, setIsDetectorModalOpen] = useState(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
+  const [isIpMirrorModalOpen, setIsIpMirrorModalOpen] = useState(false);
 
   // Device Detector Hook
   const {
@@ -81,6 +99,7 @@ export default function App() {
     videoElementRef,
     startDeviceCapture,
     startRemotePlayCapture,
+    startNetworkIpCapture,
     stopStream,
     captureSnapshot,
     startRecording,
@@ -167,8 +186,12 @@ export default function App() {
         detectedDevicesCount={videoDevices.length}
         onOpenDetectorModal={() => setIsDetectorModalOpen(true)}
         onOpenGuideModal={() => setIsGuideModalOpen(true)}
+        onOpenIpMirrorModal={() => setIsIpMirrorModalOpen(true)}
         onRescan={() => scanDevices(true)}
         isScanning={isScanning}
+        activeIpAddress={
+          sourceMode === 'network_ip' ? `${networkConfig.ip}:${networkConfig.port}` : undefined
+        }
       />
 
       {/* Main Studio Body (Sidebar + Video Display Area) */}
@@ -193,6 +216,10 @@ export default function App() {
           onUpdatePerformanceSettings={handleUpdatePerformanceSettings}
           isActive={isActive}
           isLoading={isLoading}
+          sourceMode={sourceMode}
+          networkConfig={networkConfig}
+          onChangeNetworkConfig={handleUpdateNetworkConfig}
+          onStartNetworkCapture={startNetworkIpCapture}
           onStartDeviceCapture={() => startDeviceCapture()}
           onStartRemotePlayCapture={startRemotePlayCapture}
           onStopStream={stopStream}
@@ -230,6 +257,8 @@ export default function App() {
             onUpdatePerformanceSettings={handleUpdatePerformanceSettings}
             onStartDeviceCapture={() => startDeviceCapture()}
             onStartRemotePlayCapture={startRemotePlayCapture}
+            onOpenIpMirrorModal={() => setIsIpMirrorModalOpen(true)}
+            sourceMode={sourceMode}
             onStopStream={stopStream}
             onCaptureSnapshot={() => captureSnapshot('png')}
             onStartRecording={() => startRecording(25)}
@@ -282,6 +311,20 @@ export default function App() {
         selectedConsole={selectedConsole}
         onSelectConsole={handleSelectConsole}
         onStartRemotePlayCapture={startRemotePlayCapture}
+      />
+
+      {/* IP & Port Screen Mirror Configuration Modal */}
+      <IpMirrorModal
+        isOpen={isIpMirrorModalOpen}
+        onClose={() => setIsIpMirrorModalOpen(false)}
+        config={networkConfig}
+        onChangeConfig={handleUpdateNetworkConfig}
+        onStartStream={(cfg) => {
+          startNetworkIpCapture(cfg);
+        }}
+        onStopStream={stopStream}
+        isActive={isActive && sourceMode === 'network_ip'}
+        isLoading={isLoading}
       />
     </div>
   );

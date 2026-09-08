@@ -27,12 +27,15 @@ import {
   Disc,
   StopCircle,
   Layers,
+  Wifi,
 } from 'lucide-react';
 import {
+  CaptureSourceMode,
   ConsoleType,
   CustomFilterSettings,
   DetectedDevice,
   FilterPresetKey,
+  NetworkStreamConfig,
   PerformanceSettings,
   RecordingState,
   ResolutionPresetKey,
@@ -44,6 +47,7 @@ import {
   FILTER_PRESETS,
   RESOLUTION_PRESETS,
 } from '../constants/presets';
+import { IpMirrorPanel } from './IpMirrorPanel';
 
 interface SidebarProps {
   selectedConsole: ConsoleType;
@@ -64,6 +68,10 @@ interface SidebarProps {
   onUpdatePerformanceSettings: (settings: Partial<PerformanceSettings>) => void;
   isActive: boolean;
   isLoading: boolean;
+  sourceMode: CaptureSourceMode;
+  networkConfig: NetworkStreamConfig;
+  onChangeNetworkConfig: (config: Partial<NetworkStreamConfig>) => void;
+  onStartNetworkCapture: (config: NetworkStreamConfig) => void;
   onStartDeviceCapture: () => void;
   onStartRemotePlayCapture: () => void;
   onStopStream: () => void;
@@ -105,6 +113,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUpdatePerformanceSettings,
   isActive,
   isLoading,
+  sourceMode,
+  networkConfig,
+  onChangeNetworkConfig,
+  onStartNetworkCapture,
   onStartDeviceCapture,
   onStartRemotePlayCapture,
   onStopStream,
@@ -124,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isScanning,
   telemetry,
 }) => {
-  const [activeTab, setActiveTab] = useState<'capture' | 'filters' | 'performance' | 'audio' | 'record'>('capture');
+  const [activeTab, setActiveTab] = useState<'capture' | 'ip_mirror' | 'filters' | 'performance' | 'audio' | 'record'>('capture');
   const [recBitrate, setRecBitrate] = useState<number>(25);
 
   const currentConsole = CONSOLE_PROFILES[selectedConsole] || CONSOLE_PROFILES['auto'];
@@ -155,6 +167,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <Gamepad2 size={11} />
           <span>DEVICE</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ip_mirror')}
+          className={`flex-1 py-1.5 px-1.5 text-[9px] font-bold font-mono tracking-wider rounded transition-all flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap ${
+            activeTab === 'ip_mirror'
+              ? 'bg-[#1e1e1e] text-[#00ffcc] border border-[#00ffcc44] shadow-sm'
+              : 'text-[#888] hover:text-[#bbb] hover:bg-[#181818]'
+          }`}
+        >
+          <Wifi size={11} className={sourceMode === 'network_ip' && isActive ? 'text-[#00ffcc] animate-pulse' : ''} />
+          <span>IP MIRROR</span>
         </button>
 
         <button
@@ -397,6 +421,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
           </>
+        )}
+
+        {/* ================= TAB: IP & PORT SCREEN MIRROR ================= */}
+        {activeTab === 'ip_mirror' && (
+          <IpMirrorPanel
+            config={networkConfig}
+            onChangeConfig={onChangeNetworkConfig}
+            onStartStream={onStartNetworkCapture}
+            onStopStream={onStopStream}
+            isActive={isActive && sourceMode === 'network_ip'}
+            isLoading={isLoading}
+          />
         )}
 
         {/* ================= TAB 2: RTX PERFORMANCE & LATENCY ================= */}

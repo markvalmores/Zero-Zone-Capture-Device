@@ -1,6 +1,6 @@
 {
   "name": "zerozonecapturedevice",
-  "description": "Professional low-latency video capture device player & detector for PS5, PS4, Xbox, Nintendo Switch, Switch 2, Type-C OTG, and HDMI capture cards.",
+  "description": "Professional ultra-low latency capture & wireless screen mirror player for iOS, Android, PS5, Switch, and HDMI/UVC with direct IP:Port stream input.",
   "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

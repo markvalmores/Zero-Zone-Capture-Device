@@ -12,8 +12,9 @@ import {
   RefreshCw,
   Gauge,
   Sparkles,
+  Wifi,
 } from 'lucide-react';
-import { ConsoleType, PerformanceSettings, StreamTelemetry } from '../types';
+import { CaptureSourceMode, ConsoleType, PerformanceSettings, StreamTelemetry } from '../types';
 import { CONSOLE_PROFILES } from '../constants/presets';
 
 interface HeaderProps {
@@ -22,12 +23,14 @@ interface HeaderProps {
   performanceSettings: PerformanceSettings;
   onUpdatePerformanceSettings: (settings: Partial<PerformanceSettings>) => void;
   isActive: boolean;
-  sourceMode: 'device' | 'remote_play_screen';
+  sourceMode: CaptureSourceMode;
   detectedDevicesCount: number;
   onOpenDetectorModal: () => void;
   onOpenGuideModal: () => void;
+  onOpenIpMirrorModal: () => void;
   onRescan: () => void;
   isScanning: boolean;
+  activeIpAddress?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -40,8 +43,10 @@ export const Header: React.FC<HeaderProps> = ({
   detectedDevicesCount,
   onOpenDetectorModal,
   onOpenGuideModal,
+  onOpenIpMirrorModal,
   onRescan,
   isScanning,
+  activeIpAddress,
 }) => {
   const currentProfile = CONSOLE_PROFILES[selectedConsole] || CONSOLE_PROFILES['auto'];
 
@@ -96,13 +101,39 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-1 bg-[#141414] px-2 py-1 rounded border border-[#262626] text-[10px] text-[#aaa]">
           <span className="text-[#666] font-mono">SOURCE:</span>
           <span className="font-semibold text-white uppercase font-mono">
-            {sourceMode === 'device' ? 'HARDWARE UVC / OTG' : 'SCREEN MIRROR 144Hz'}
+            {sourceMode === 'device'
+              ? 'HARDWARE UVC / OTG'
+              : sourceMode === 'network_ip'
+              ? activeIpAddress
+                ? `IP: ${activeIpAddress}`
+                : 'IP:PORT STREAM'
+              : 'SCREEN MIRROR 144Hz'}
           </span>
         </div>
       </div>
 
       {/* Live Stream Telemetry & Quick Action Bar */}
       <div className="flex items-center gap-2 flex-wrap">
+        {/* IP & Port Wireless Mirror Button */}
+        <button
+          onClick={onOpenIpMirrorModal}
+          title="Open IP & Port Wireless Screen Mirror (Phone / Wi-Fi)"
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-all text-[10px] font-mono font-bold cursor-pointer ${
+            sourceMode === 'network_ip' && isActive
+              ? 'bg-[#00ffcc22] text-[#00ffcc] border-[#00ffcc] shadow-[0_0_10px_rgba(0,255,204,0.3)]'
+              : 'bg-[#171717] hover:bg-[#222] text-[#ddd] hover:text-[#00ffcc] border-[#333]'
+          }`}
+        >
+          <Wifi
+            size={12}
+            className={sourceMode === 'network_ip' && isActive ? 'text-[#00ffcc] animate-pulse' : 'text-[#00ffcc]'}
+          />
+          <span>IP MIRROR</span>
+          {sourceMode === 'network_ip' && isActive && (
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00ffcc] animate-ping" />
+          )}
+        </button>
+
         {/* Latency Diagnostic Overlay Trigger Button */}
         <button
           onClick={() =>

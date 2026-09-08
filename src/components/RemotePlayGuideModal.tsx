@@ -8,6 +8,7 @@ import {
   Tv,
   Usb,
   X,
+  Zap,
 } from 'lucide-react';
 import { ConsoleType } from '../types';
 

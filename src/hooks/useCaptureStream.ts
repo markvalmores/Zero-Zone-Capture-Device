@@ -3,6 +3,7 @@ import {
   CaptureSourceMode,
   ConsoleType,
   LatencyDiagnosticData,
+  NetworkStreamConfig,
   RecordingState,
   ResolutionPresetKey,
   StreamTelemetry,
@@ -84,6 +85,13 @@ export function useCaptureStream({
   const rvfcCallbackIdRef = useRef<number | null>(null);
   const rafCallbackIdRef = useRef<number | null>(null);
 
+  // Network IP Stream Refs
+  const networkCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const networkAnimationIdRef = useRef<number | null>(null);
+  const networkImageRef = useRef<HTMLImageElement | null>(null);
+  const networkAudioRef = useRef<HTMLAudioElement | null>(null);
+  const activeNetworkConfigRef = useRef<NetworkStreamConfig | null>(null);
+
   // Stop active stream
   const stopStream = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -96,6 +104,29 @@ export function useCaptureStream({
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
+    }
+
+    if (networkAnimationIdRef.current !== null) {
+      cancelAnimationFrame(networkAnimationIdRef.current);
+      networkAnimationIdRef.current = null;
+    }
+    if (networkImageRef.current) {
+      networkImageRef.current.onload = null;
+      networkImageRef.current.onerror = null;
+      networkImageRef.current.src = '';
+      networkImageRef.current = null;
+    }
+    if (networkAudioRef.current) {
+      networkAudioRef.current.pause();
+      networkAudioRef.current.src = '';
+      networkAudioRef.current = null;
+    }
+    networkCanvasRef.current = null;
+    activeNetworkConfigRef.current = null;
+
+    if (videoElementRef.current) {
+      videoElementRef.current.srcObject = null;
+      videoElementRef.current.src = '';
     }
 
     if (stream) {
@@ -271,6 +302,251 @@ export function useCaptureStream({
       }
     }
   }, [stopStream, onAudioStreamReady]);
+
+  // Start Network IP Screen Mirror Capture (IP & Port)
+  const startNetworkIpCapture = useCallback(
+    async (config: NetworkStreamConfig) => {
+      stopStream();
+      setIsLoading(true);
+      setError(null);
+      activeNetworkConfigRef.current = config;
+
+      const sanitizedIp = config.ip.trim();
+      const sanitizedPort = config.port.toString().trim();
+      let sanitizedPath = config.path.trim();
+      if (sanitizedPath && !sanitizedPath.startsWith('/')) {
+        sanitizedPath = '/' + sanitizedPath;
+      }
+      const fps = config.targetFps || 60;
+
+      // Local Demo Mode (High-framerate animated test pattern with simulated mobile mirror)
+      if (config.streamType === 'demo' || sanitizedIp.toLowerCase() === 'demo') {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1920;
+        canvas.height = 1080;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        networkCanvasRef.current = canvas;
+
+        let frame = 0;
+        const startTime = performance.now();
+
+        const drawDemo = () => {
+          if (!ctx) return;
+          frame++;
+          const now = performance.now();
+          const elapsed = (now - startTime) / 1000;
+
+          // Dark Background
+          ctx.fillStyle = '#0a0a0a';
+          ctx.fillRect(0, 0, 1920, 1080);
+
+          // Grid
+          ctx.strokeStyle = '#14201c';
+          ctx.lineWidth = 1;
+          for (let x = 0; x < 1920; x += 60) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, 1080);
+            ctx.stroke();
+          }
+          for (let y = 0; y < 1080; y += 60) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(1920, y);
+            ctx.stroke();
+          }
+
+          // Dynamic Sweep Beam
+          const sweepX = (now * 0.9) % 1920;
+          const grad = ctx.createLinearGradient(sweepX - 80, 0, sweepX + 80, 0);
+          grad.addColorStop(0, 'rgba(0, 255, 204, 0)');
+          grad.addColorStop(0.5, 'rgba(0, 255, 204, 0.45)');
+          grad.addColorStop(1, 'rgba(0, 255, 204, 0)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(sweepX - 80, 0, 160, 1080);
+
+          // Bouncing Target Ball
+          const bounceX = 960 + Math.sin(now * 0.003) * 550;
+          const bounceY = 540 + Math.cos(now * 0.005) * 320;
+          ctx.fillStyle = '#00ffcc';
+          ctx.shadowColor = '#00ffcc';
+          ctx.shadowBlur = 20;
+          ctx.beginPath();
+          ctx.arc(bounceX, bounceY, 20, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          // Header HUD Card
+          ctx.fillStyle = 'rgba(16, 16, 16, 0.9)';
+          ctx.strokeStyle = '#00ffcc';
+          ctx.lineWidth = 2;
+          ctx.fillRect(80, 60, 1760, 180);
+          ctx.strokeRect(80, 60, 1760, 180);
+
+          ctx.fillStyle = '#00ffcc';
+          ctx.font = 'bold 32px monospace';
+          ctx.fillText('ZEROZONE IP SCREEN MIRROR - DEMO TEST PATTERN', 120, 115);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '20px monospace';
+          ctx.fillText(
+            `TARGET: http://${sanitizedIp || '192.168.1.100'}:${sanitizedPort || '8080'}${sanitizedPath || '/video'} (SIMULATION ENGINE)`,
+            120,
+            155
+          );
+
+          ctx.fillStyle = '#ffcc00';
+          ctx.font = 'bold 22px monospace';
+          ctx.fillText(
+            `CADENCE: ${fps} FPS | RENDER DELAY: ${(Math.random() * 0.3 + 2.4).toFixed(1)}ms | FRAME: #${frame} | ELAPSED: ${elapsed.toFixed(1)}s`,
+            120,
+            200
+          );
+
+          // Simulated Phone Frame
+          ctx.fillStyle = '#141414';
+          ctx.strokeStyle = '#333';
+          ctx.lineWidth = 4;
+          ctx.fillRect(720, 290, 480, 740);
+          ctx.strokeRect(720, 290, 480, 740);
+
+          ctx.fillStyle = '#3ddc84';
+          ctx.font = 'bold 20px monospace';
+          ctx.fillText('MOBILE SCREEN ACTIVE', 820, 360);
+
+          ctx.fillStyle = '#aaa';
+          ctx.font = '16px monospace';
+          ctx.fillText(`Port: ${sanitizedPort || '8080'}`, 840, 410);
+          ctx.fillText(`Protocol: HTTP / MJPEG`, 840, 445);
+          ctx.fillText(`Timestamp: ${new Date().toLocaleTimeString()}`, 840, 480);
+
+          networkAnimationIdRef.current = requestAnimationFrame(drawDemo);
+        };
+
+        drawDemo();
+
+        try {
+          const canvasStream = canvas.captureStream(fps);
+          setStream(canvasStream);
+          setSourceMode('network_ip');
+          setIsActive(true);
+          setIsLoading(false);
+          setError(null);
+
+          if (videoElementRef.current) {
+            videoElementRef.current.srcObject = canvasStream;
+          }
+
+          setTelemetry((prev) => ({
+            ...prev,
+            actualWidth: 1920,
+            actualHeight: 1080,
+            targetFps: fps,
+            signalLocked: true,
+            lowLatencyMode: true,
+          }));
+          return;
+        } catch (err: any) {
+          console.error('Error creating demo canvas stream:', err);
+        }
+      }
+
+      // Real Network IP stream (MJPEG / HTTP)
+      const fullUrl = `${config.protocol}://${sanitizedIp}:${sanitizedPort}${sanitizedPath}`;
+
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1920;
+        canvas.height = 1080;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        networkCanvasRef.current = canvas;
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        networkImageRef.current = img;
+
+        let streamConnected = false;
+        const connectionTimeout = window.setTimeout(() => {
+          if (!streamConnected) {
+            console.warn('Network stream connection timeout for', fullUrl);
+          }
+        }, 8000);
+
+        const renderLoop = () => {
+          if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+            if (canvas.width !== img.naturalWidth || canvas.height !== img.naturalHeight) {
+              canvas.width = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+            }
+            ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          }
+          networkAnimationIdRef.current = requestAnimationFrame(renderLoop);
+        };
+
+        img.onload = () => {
+          window.clearTimeout(connectionTimeout);
+          if (!streamConnected) {
+            streamConnected = true;
+            setIsLoading(false);
+            setIsActive(true);
+            setError(null);
+          }
+        };
+
+        img.onerror = () => {
+          setIsLoading(false);
+          setError(
+            `Unable to reach stream at ${fullUrl}. Please verify:\n1. Your phone and computer are on the same Wi-Fi network.\n2. The screen mirroring app on your phone is running on port ${sanitizedPort}.\n3. If your browser blocks HTTP on HTTPS (Mixed Content), click "Open Stream in Tab" or enable HTTPS in your phone app.`
+          );
+        };
+
+        img.src = fullUrl;
+        renderLoop();
+
+        const canvasStream = canvas.captureStream(fps);
+        setStream(canvasStream);
+        setSourceMode('network_ip');
+        setIsActive(true);
+        setIsLoading(false);
+        setError(null);
+
+        if (videoElementRef.current) {
+          videoElementRef.current.srcObject = canvasStream;
+        }
+
+        // Companion audio stream if enabled
+        if (config.audioEnabled && config.audioPath) {
+          try {
+            const audioUrl = `${config.protocol}://${sanitizedIp}:${config.audioPort || sanitizedPort}${
+              config.audioPath.startsWith('/') ? config.audioPath : '/' + config.audioPath
+            }`;
+            const audio = new Audio(audioUrl);
+            audio.crossOrigin = 'anonymous';
+            audio.autoplay = true;
+            networkAudioRef.current = audio;
+            audio.play().catch((err) => {
+              console.warn('Audio companion stream play failed:', err);
+            });
+          } catch (audioErr) {
+            console.warn('Error attaching companion audio:', audioErr);
+          }
+        }
+
+        setTelemetry((prev) => ({
+          ...prev,
+          targetFps: fps,
+          signalLocked: true,
+          lowLatencyMode: true,
+        }));
+      } catch (err: any) {
+        console.error('Error starting network stream capture:', err);
+        setIsLoading(false);
+        setIsActive(false);
+        setError(`Network mirror error: ${err.message || 'Unknown network error'}`);
+      }
+    },
+    [stopStream]
+  );
 
   // Real-time Precision Frame-to-Display Latency & Telemetry Engine
   useEffect(() => {
@@ -544,6 +820,7 @@ export function useCaptureStream({
     videoElementRef,
     startDeviceCapture,
     startRemotePlayCapture,
+    startNetworkIpCapture,
     stopStream,
     captureSnapshot,
     startRecording,

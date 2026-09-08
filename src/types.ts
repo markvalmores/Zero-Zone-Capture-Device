@@ -11,7 +11,36 @@ export type ConsoleType =
   | 'type_c_otg'
   | 'hdmi_grabber';
 
-export type CaptureSourceMode = 'device' | 'remote_play_screen';
+export type CaptureSourceMode = 'device' | 'remote_play_screen' | 'network_ip';
+
+export type NetworkStreamType = 'mjpeg' | 'video' | 'demo' | 'auto';
+
+export interface NetworkStreamConfig {
+  ip: string;
+  port: string;
+  protocol: 'http' | 'https' | 'ws' | 'wss';
+  path: string;
+  streamType: NetworkStreamType;
+  targetFps: number;
+  autoReconnect: boolean;
+  lowLatencyBuffer: boolean;
+  audioEnabled: boolean;
+  audioPort?: string;
+  audioPath?: string;
+  presetApp: 'screen_stream' | 'ip_webcam' | 'droidcam' | 'vlc_obs' | 'custom' | 'demo';
+}
+
+export interface NetworkAppPreset {
+  id: NetworkStreamConfig['presetApp'];
+  name: string;
+  defaultPort: string;
+  defaultPath: string;
+  streamType: NetworkStreamType;
+  audioSupported: boolean;
+  defaultAudioPath?: string;
+  description: string;
+  badge: string;
+}
 
 export type ResolutionPresetKey =
   | '4k60'

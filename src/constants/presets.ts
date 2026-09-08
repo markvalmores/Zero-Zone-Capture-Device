@@ -3,6 +3,8 @@ import {
   ConsoleType,
   CustomFilterSettings,
   FilterPresetKey,
+  NetworkAppPreset,
+  NetworkStreamConfig,
   PerformanceSettings,
   ResolutionConfig,
   ResolutionPresetKey,
@@ -359,6 +361,86 @@ export function buildFilterCss(
   const h = custom.hueRotate;
   return `brightness(${b}) contrast(${c}) saturate(${s}) hue-rotate(${h}deg)`;
 }
+
+export const DEFAULT_NETWORK_STREAM_CONFIG: NetworkStreamConfig = {
+  ip: '192.168.1.100',
+  port: '8080',
+  protocol: 'http',
+  path: '/',
+  streamType: 'auto',
+  targetFps: 60,
+  autoReconnect: true,
+  lowLatencyBuffer: true,
+  audioEnabled: false,
+  audioPort: '8080',
+  audioPath: '/audio.wav',
+  presetApp: 'screen_stream',
+};
+
+export const NETWORK_APP_PRESETS: NetworkAppPreset[] = [
+  {
+    id: 'screen_stream',
+    name: 'Screen Stream over HTTP',
+    defaultPort: '8080',
+    defaultPath: '/',
+    streamType: 'mjpeg',
+    audioSupported: false,
+    description: 'Popular free app on Android & iOS. High-refresh MJPEG stream over local Wi-Fi.',
+    badge: 'Android / iOS',
+  },
+  {
+    id: 'ip_webcam',
+    name: 'IP Webcam (Android)',
+    defaultPort: '8080',
+    defaultPath: '/video',
+    streamType: 'mjpeg',
+    audioSupported: true,
+    defaultAudioPath: '/audio.wav',
+    description: 'Android IP Webcam stream. Supports video + uncompressed PCM audio loopback.',
+    badge: 'Android',
+  },
+  {
+    id: 'droidcam',
+    name: 'DroidCam Screen / Cam',
+    defaultPort: '4747',
+    defaultPath: '/video',
+    streamType: 'mjpeg',
+    audioSupported: false,
+    description: 'Ultra-low latency DroidCam port over Wi-Fi or USB tethering.',
+    badge: 'Android / iOS',
+  },
+  {
+    id: 'vlc_obs',
+    name: 'OBS / VLC HTTP Stream',
+    defaultPort: '8080',
+    defaultPath: '/live',
+    streamType: 'video',
+    audioSupported: true,
+    description: 'Direct H.264 / MP4 / WebM HTTP live stream from OBS Studio or VLC.',
+    badge: 'Desktop / Relay',
+  },
+  {
+    id: 'custom',
+    name: 'Custom IP & Port',
+    defaultPort: '8080',
+    defaultPath: '/video',
+    streamType: 'auto',
+    audioSupported: true,
+    defaultAudioPath: '/audio',
+    description: 'Input any custom IPv4 / domain, port, and endpoint path.',
+    badge: 'Advanced',
+  },
+  {
+    id: 'demo',
+    name: 'Local Test Pattern (Demo)',
+    defaultPort: '3000',
+    defaultPath: '/demo',
+    streamType: 'demo',
+    audioSupported: true,
+    description: 'Instant 60/120/144 FPS animated test pattern to verify player and filters immediately.',
+    badge: 'Zero-Hardware Test',
+  },
+];
 
 // Known capture card identifiers and keywords
 export const CAPTURE_CARD_KEYWORDS = [

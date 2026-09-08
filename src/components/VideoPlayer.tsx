@@ -17,6 +17,7 @@ import {
   Tv,
   Volume2,
   VolumeX,
+  Wifi,
   Zap,
 } from 'lucide-react';
 import {
@@ -44,6 +45,8 @@ interface VideoPlayerProps {
   onUpdatePerformanceSettings: (settings: Partial<PerformanceSettings>) => void;
   onStartDeviceCapture: () => void;
   onStartRemotePlayCapture: () => void;
+  onOpenIpMirrorModal?: () => void;
+  sourceMode?: string;
   onStopStream: () => void;
   onCaptureSnapshot: () => void;
   onStartRecording: () => void;
@@ -67,6 +70,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onUpdatePerformanceSettings,
   onStartDeviceCapture,
   onStartRemotePlayCapture,
+  onOpenIpMirrorModal,
+  sourceMode,
   onStopStream,
   onCaptureSnapshot,
   onStartRecording,
@@ -212,7 +217,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             )}
 
             <span className="text-[9px] px-1.5 py-0.2 bg-[#00ffcc22] text-[#00ffcc] rounded border border-[#00ffcc33] font-bold">
-              {currentConsole.shortName}
+              {sourceMode === 'network_ip' ? 'IP:PORT STREAM' : currentConsole.shortName}
             </span>
           </div>
 
@@ -303,6 +308,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 >
                   TRY SCREEN / MIRROR
                 </button>
+                {onOpenIpMirrorModal && (
+                  <button
+                    onClick={onOpenIpMirrorModal}
+                    className="bg-[#1a1a1a] hover:bg-[#252525] text-[#00ffcc] border border-[#00ffcc44] text-[11px] px-3 py-1.5 rounded cursor-pointer flex items-center gap-1"
+                  >
+                    <Wifi size={12} />
+                    <span>INPUT IP:PORT</span>
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -345,6 +359,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                       : 'CAPTURE REMOTE PLAY APP'}
                   </span>
                 </button>
+
+                {onOpenIpMirrorModal && (
+                  <button
+                    onClick={onOpenIpMirrorModal}
+                    disabled={isLoading}
+                    className="bg-[#141414] hover:bg-[#202020] text-white border border-[#333] hover:border-[#00ffcc] text-xs font-bold px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <Wifi size={15} className="text-[#00ffcc]" />
+                    <span>INPUT IP & PORT MIRROR</span>
+                  </button>
+                )}
               </div>
 
               {/* Hardware Connection Tips */}
