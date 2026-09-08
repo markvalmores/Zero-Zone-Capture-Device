@@ -21,6 +21,8 @@ import {
   Wifi,
   X,
   Zap,
+  Clipboard,
+  Link,
 } from 'lucide-react';
 import { NetworkAppPreset, NetworkStreamConfig } from '../types';
 import { DEFAULT_NETWORK_STREAM_CONFIG, NETWORK_APP_PRESETS } from '../constants/presets';
@@ -28,12 +30,17 @@ import { DEFAULT_NETWORK_STREAM_CONFIG, NETWORK_APP_PRESETS } from '../constants
 interface IpMirrorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onStartNetworkCapture: (config: NetworkStreamConfig) => void;
+  config?: NetworkStreamConfig;
+  currentConfig?: NetworkStreamConfig;
+  onChangeConfig?: (config: NetworkStreamConfig) => void;
+  onUpdateConfig?: (config: NetworkStreamConfig) => void;
+  onStartStream?: (config: NetworkStreamConfig) => void;
+  onStartNetworkCapture?: (config: NetworkStreamConfig) => void;
+  onOpenBrowserMirrorModal?: () => void;
   onStopStream: () => void;
   isActive: boolean;
-  sourceMode: string;
-  currentConfig: NetworkStreamConfig;
-  onUpdateConfig: (config: NetworkStreamConfig) => void;
+  isLoading?: boolean;
+  sourceMode?: string;
 }
 
 const STORAGE_KEY_RECENT_IPS = 'zerozone_recent_ips';
@@ -41,14 +48,20 @@ const STORAGE_KEY_RECENT_IPS = 'zerozone_recent_ips';
 export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
   isOpen,
   onClose,
+  config: propConfig,
+  currentConfig,
+  onChangeConfig,
+  onUpdateConfig,
+  onStartStream,
   onStartNetworkCapture,
+  onOpenBrowserMirrorModal,
   onStopStream,
   isActive,
-  sourceMode,
-  currentConfig,
-  onUpdateConfig,
+  isLoading = false,
+  sourceMode = 'network_ip',
 }) => {
-  const [config, setConfig] = useState<NetworkStreamConfig>(currentConfig || DEFAULT_NETWORK_STREAM_CONFIG);
+  const initialConfig = propConfig || currentConfig || DEFAULT_NETWORK_STREAM_CONFIG;
+  const [config, setConfig] = useState<NetworkStreamConfig>(initialConfig);
   const [pingStatus, setPingStatus] = useState<{
     testing: boolean;
     success?: boolean;
@@ -60,6 +73,26 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
   const [activePresetTab, setActivePresetTab] = useState<string>(config.presetApp || 'screen_stream');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+
+  // Sync with prop when opened or updated from outside
+  useEffect(() => {
+    if (propConfig) {
+      setConfig(propConfig);
+    } else if (currentConfig) {
+      setConfig(currentConfig);
+    }
+  }, [propConfig, currentConfig]);
+
+  // Safe unified state & parent updater
+  const updateConfig = (updated: NetworkStreamConfig) => {
+    setConfig(updated);
+    if (typeof onChangeConfig === 'function') {
+      onChangeConfig(updated);
+    }
+    if (typeof onUpdateConfig === 'function') {
+      onUpdateConfig(updated);
+    }
+  };
 
   // Load recent IPs from localStorage
   useEffect(() => {
@@ -96,6 +129,33 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
     config.path.startsWith('/') ? config.path : '/' + config.path
   }`;
 
+  const handlePasteFullLink = (rawInput: string) => {
+    const trimmed = rawInput.trim();
+    if (!trimmed) return;
+
+    try {
+      let candidate = trimmed;
+      if (!/^https?:\/\//i.test(candidate) && !/^wss?:\/\//i.test(candidate)) {
+        candidate = 'http://' + candidate;
+      }
+      const parsed = new URL(candidate);
+      const protocol = parsed.protocol.replace(':', '') as any;
+      const ip = parsed.hostname;
+      const port = parsed.port || (protocol === 'https' ? '443' : '80');
+      const path = parsed.pathname + (parsed.search || '');
+
+      updateConfig({
+        ...config,
+        protocol: ['http', 'https', 'ws', 'wss'].includes(protocol) ? protocol : 'http',
+        ip,
+        port,
+        path: path && path !== '/' ? path : config.path,
+      });
+    } catch (e) {
+      updateConfig({ ...config, ip: trimmed });
+    }
+  };
+
   const handlePresetSelect = (preset: NetworkAppPreset) => {
     setActivePresetTab(preset.id);
     const updated: NetworkStreamConfig = {
@@ -107,8 +167,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
       audioEnabled: preset.audioSupported,
       audioPath: preset.defaultAudioPath || '/audio.wav',
     };
-    setConfig(updated);
-    onUpdateConfig(updated);
+    updateConfig(updated);
   };
 
   const handleTestPing = async () => {
@@ -177,7 +236,11 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
 
   const handleStartMirror = () => {
     saveRecent(config.ip, config.port, config.presetApp);
-    onStartNetworkCapture(config);
+    if (typeof onStartNetworkCapture === 'function') {
+      onStartNetworkCapture(config);
+    } else if (typeof onStartStream === 'function') {
+      onStartStream(config);
+    }
     onClose();
   };
 
@@ -272,6 +335,47 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
               <span className="text-[9px] text-[#666]">e.g. As displayed in your phone's mirroring app</span>
             </div>
 
+            {/* Quick Paste Full Link Option */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-[#181818] border border-[#2c2c2c] text-[11px]">
+              <div className="flex items-center gap-2 text-[#aaa]">
+                <Link size={13} className="text-[#00ffcc]" />
+                <span>Have a full screen mirror URL?</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (navigator.clipboard) {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) handlePasteFullLink(text);
+                      } catch (e) {
+                        // ignore
+                      }
+                    }
+                  }}
+                  className="px-2 py-1 rounded bg-[#222] hover:bg-[#2e2e2e] text-[#00ffcc] text-[10px] font-bold border border-[#3a3a3a] flex items-center gap-1 cursor-pointer"
+                >
+                  <Clipboard size={11} />
+                  <span>PASTE CLIPBOARD URL</span>
+                </button>
+
+                {onOpenBrowserMirrorModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenBrowserMirrorModal();
+                    }}
+                    className="px-2 py-1 rounded bg-[#00ffcc15] hover:bg-[#00ffcc25] text-[#00ffcc] text-[10px] font-bold border border-[#00ffcc44] flex items-center gap-1 cursor-pointer"
+                  >
+                    <Globe size={11} />
+                    <span>BROWSER MIRROR TAB</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
               {/* Protocol */}
               <div className="sm:col-span-3">
@@ -280,8 +384,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                   value={config.protocol}
                   onChange={(e) => {
                     const updated = { ...config, protocol: e.target.value as any };
-                    setConfig(updated);
-                    onUpdateConfig(updated);
+                    updateConfig(updated);
                   }}
                   className="w-full bg-[#1b1b1b] border border-[#333] rounded-lg px-2.5 py-2 text-xs font-mono text-white focus:border-[#00ffcc] focus:outline-none cursor-pointer"
                 >
@@ -301,11 +404,15 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                   <input
                     type="text"
                     value={config.ip}
-                    placeholder="192.168.1.xxx"
+                    placeholder="192.168.1.xxx or paste full link"
                     onChange={(e) => {
-                      const updated = { ...config, ip: e.target.value };
-                      setConfig(updated);
-                      onUpdateConfig(updated);
+                      const val = e.target.value;
+                      if (val.includes('://') || (val.includes(':') && val.includes('.'))) {
+                        handlePasteFullLink(val);
+                      } else {
+                        const updated = { ...config, ip: val };
+                        updateConfig(updated);
+                      }
                     }}
                     className="w-full bg-[#1b1b1b] border border-[#333] rounded-lg px-3 py-2 text-xs font-mono text-white focus:border-[#00ffcc] focus:outline-none"
                   />
@@ -321,8 +428,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                   placeholder="8080"
                   onChange={(e) => {
                     const updated = { ...config, port: e.target.value };
-                    setConfig(updated);
-                    onUpdateConfig(updated);
+                    updateConfig(updated);
                   }}
                   className="w-full bg-[#1b1b1b] border border-[#333] rounded-lg px-3 py-2 text-xs font-mono text-white focus:border-[#00ffcc] focus:outline-none"
                 />
@@ -336,8 +442,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                 type="button"
                 onClick={() => {
                   const updated = { ...config, ip: '192.168.1.' };
-                  setConfig(updated);
-                  onUpdateConfig(updated);
+                  updateConfig(updated);
                 }}
                 className="px-2 py-0.5 rounded bg-[#1e1e1e] hover:bg-[#282828] text-[#aaa] hover:text-[#00ffcc] text-[9.5px] border border-[#333] cursor-pointer"
               >
@@ -347,8 +452,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                 type="button"
                 onClick={() => {
                   const updated = { ...config, ip: '192.168.0.' };
-                  setConfig(updated);
-                  onUpdateConfig(updated);
+                  updateConfig(updated);
                 }}
                 className="px-2 py-0.5 rounded bg-[#1e1e1e] hover:bg-[#282828] text-[#aaa] hover:text-[#00ffcc] text-[9.5px] border border-[#333] cursor-pointer"
               >
@@ -358,8 +462,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                 type="button"
                 onClick={() => {
                   const updated = { ...config, ip: '127.0.0.1' };
-                  setConfig(updated);
-                  onUpdateConfig(updated);
+                  updateConfig(updated);
                 }}
                 className="px-2 py-0.5 rounded bg-[#1e1e1e] hover:bg-[#282828] text-[#aaa] hover:text-[#00ffcc] text-[9.5px] border border-[#333] cursor-pointer"
               >
@@ -374,8 +477,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                     presetApp: 'demo',
                     streamType: 'demo',
                   };
-                  setConfig(updated);
-                  onUpdateConfig(updated);
+                  updateConfig(updated);
                 }}
                 className="px-2 py-0.5 rounded bg-[#ffcc0015] hover:bg-[#ffcc0028] text-[#ffcc00] text-[9.5px] border border-[#ffcc0040] cursor-pointer flex items-center gap-1"
               >
@@ -463,8 +565,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                       placeholder="/video or /stream.mjpeg"
                       onChange={(e) => {
                         const updated = { ...config, path: e.target.value };
-                        setConfig(updated);
-                        onUpdateConfig(updated);
+                        updateConfig(updated);
                       }}
                       className="w-full bg-[#1b1b1b] border border-[#333] rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:border-[#00ffcc] focus:outline-none"
                     />
@@ -482,8 +583,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                           type="button"
                           onClick={() => {
                             const updated = { ...config, targetFps: fps };
-                            setConfig(updated);
-                            onUpdateConfig(updated);
+                            updateConfig(updated);
                           }}
                           className={`flex-1 py-1 text-[10px] font-bold rounded border cursor-pointer ${
                             config.targetFps === fps
@@ -514,8 +614,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                     checked={config.audioEnabled}
                     onChange={(e) => {
                       const updated = { ...config, audioEnabled: e.target.checked };
-                      setConfig(updated);
-                      onUpdateConfig(updated);
+                      updateConfig(updated);
                     }}
                     className="w-4 h-4 accent-[#00ffcc] cursor-pointer"
                   />
@@ -530,8 +629,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                         value={config.audioPort || config.port}
                         onChange={(e) => {
                           const updated = { ...config, audioPort: e.target.value };
-                          setConfig(updated);
-                          onUpdateConfig(updated);
+                          updateConfig(updated);
                         }}
                         className="w-full bg-[#1b1b1b] border border-[#333] rounded-lg px-2.5 py-1 text-xs font-mono text-white"
                       />
@@ -543,8 +641,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                         value={config.audioPath || '/audio.wav'}
                         onChange={(e) => {
                           const updated = { ...config, audioPath: e.target.value };
-                          setConfig(updated);
-                          onUpdateConfig(updated);
+                          updateConfig(updated);
                         }}
                         className="w-full bg-[#1b1b1b] border border-[#333] rounded-lg px-2.5 py-1 text-xs font-mono text-white"
                       />
@@ -569,8 +666,7 @@ export const IpMirrorModal: React.FC<IpMirrorModalProps> = ({
                     type="button"
                     onClick={() => {
                       const updated = { ...config, ip: item.ip, port: item.port };
-                      setConfig(updated);
-                      onUpdateConfig(updated);
+                      updateConfig(updated);
                     }}
                     className="px-2.5 py-1 rounded bg-[#161616] hover:bg-[#202020] border border-[#2a2a2a] hover:border-[#00ffcc] text-[10px] text-[#ccc] hover:text-white flex items-center gap-1.5 cursor-pointer"
                   >

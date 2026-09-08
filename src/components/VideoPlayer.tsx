@@ -19,6 +19,8 @@ import {
   VolumeX,
   Wifi,
   Zap,
+  Globe,
+  Link,
 } from 'lucide-react';
 import {
   ConsoleType,
@@ -29,6 +31,7 @@ import {
 } from '../types';
 import { CONSOLE_PROFILES, buildFilterCss } from '../constants/presets';
 import { LatencyDiagnosticOverlay } from './LatencyDiagnosticOverlay';
+import { BrowserMirrorView } from './BrowserMirrorView';
 
 interface VideoPlayerProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -46,6 +49,9 @@ interface VideoPlayerProps {
   onStartDeviceCapture: () => void;
   onStartRemotePlayCapture: () => void;
   onOpenIpMirrorModal?: () => void;
+  onOpenBrowserMirrorModal?: () => void;
+  onStartBrowserMirror?: (url: string, renderMode: 'auto' | 'webview' | 'stream') => void;
+  browserMirrorUrl?: string;
   sourceMode?: string;
   onStopStream: () => void;
   onCaptureSnapshot: () => void;
@@ -71,6 +77,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onStartDeviceCapture,
   onStartRemotePlayCapture,
   onOpenIpMirrorModal,
+  onOpenBrowserMirrorModal,
+  onStartBrowserMirror,
+  browserMirrorUrl,
   sourceMode,
   onStopStream,
   onCaptureSnapshot,
@@ -174,8 +183,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         isFullscreen ? 'w-screen h-screen' : 'w-full h-full min-h-[420px]'
       }`}
     >
-      {/* Active Video Element */}
-      {isActive && (
+      {/* Active Browser Screen Mirror URL Viewport */}
+      {isActive && sourceMode === 'browser_mirror_url' && browserMirrorUrl && (
+        <BrowserMirrorView
+          url={browserMirrorUrl}
+          activeFilter={activeFilter}
+          customFilterSettings={customFilterSettings}
+          onStop={onStopStream}
+          onOpenModal={onOpenBrowserMirrorModal}
+          onSwitchToCanvasStream={() => onStartBrowserMirror?.(browserMirrorUrl, 'stream')}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
+        />
+      )}
+
+      {/* Active Video Element (Hardware / Screen Share / Direct MJPEG Canvas Stream) */}
+      {isActive && sourceMode !== 'browser_mirror_url' && (
         <video
           ref={videoRef as any}
           autoPlay
@@ -217,7 +240,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             )}
 
             <span className="text-[9px] px-1.5 py-0.2 bg-[#00ffcc22] text-[#00ffcc] rounded border border-[#00ffcc33] font-bold">
-              {sourceMode === 'network_ip' ? 'IP:PORT STREAM' : currentConsole.shortName}
+              {sourceMode === 'network_ip'
+                ? 'IP:PORT STREAM'
+                : sourceMode === 'browser_mirror_url'
+                ? 'LINK MIRROR'
+                : currentConsole.shortName}
             </span>
           </div>
 
@@ -317,6 +344,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     <span>INPUT IP:PORT</span>
                   </button>
                 )}
+                {onOpenBrowserMirrorModal && (
+                  <button
+                    onClick={onOpenBrowserMirrorModal}
+                    className="bg-[#1a1a1a] hover:bg-[#252525] text-[#00ffcc] border border-[#00ffcc44] text-[11px] px-3 py-1.5 rounded cursor-pointer flex items-center gap-1"
+                  >
+                    <Globe size={12} />
+                    <span>PASTE LINK</span>
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -360,14 +396,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   </span>
                 </button>
 
+                {onOpenBrowserMirrorModal && (
+                  <button
+                    onClick={onOpenBrowserMirrorModal}
+                    disabled={isLoading}
+                    className="bg-[#181818] hover:bg-[#252525] text-white border border-[#333] hover:border-[#00ffcc] text-xs font-bold px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <Globe size={15} className="text-[#00ffcc]" />
+                    <span>PASTE MIRROR LINK</span>
+                  </button>
+                )}
+
                 {onOpenIpMirrorModal && (
                   <button
                     onClick={onOpenIpMirrorModal}
                     disabled={isLoading}
-                    className="bg-[#141414] hover:bg-[#202020] text-white border border-[#333] hover:border-[#00ffcc] text-xs font-bold px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="bg-[#141414] hover:bg-[#202020] text-[#aaa] hover:text-white border border-[#2a2a2a] hover:border-[#444] text-xs font-bold px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     <Wifi size={15} className="text-[#00ffcc]" />
-                    <span>INPUT IP & PORT MIRROR</span>
+                    <span>IP:PORT</span>
                   </button>
                 )}
               </div>

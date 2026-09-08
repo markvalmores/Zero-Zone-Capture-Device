@@ -29,6 +29,7 @@ export function useCaptureStream({
 }: UseCaptureStreamProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [sourceMode, setSourceMode] = useState<CaptureSourceMode>('device');
+  const [browserMirrorUrl, setBrowserMirrorUrl] = useState<string>('');
   const [isActive, setIsActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +137,7 @@ export function useCaptureStream({
     }
 
     setStream(null);
+    setBrowserMirrorUrl('');
     setIsActive(false);
     setIsLoading(false);
     setTelemetry((prev) => ({
@@ -548,6 +550,100 @@ export function useCaptureStream({
     [stopStream]
   );
 
+  // Start Browser Screen Mirror by Link / URL
+  const startBrowserMirrorCapture = useCallback(
+    async (rawUrl: string, renderMode: 'auto' | 'webview' | 'stream' = 'auto', targetFps: number = 60) => {
+      stopStream();
+      setIsLoading(true);
+      setError(null);
+
+      const trimmed = (rawUrl || '').trim();
+      if (!trimmed) {
+        setIsLoading(false);
+        setError('Please enter or paste a screen mirror link.');
+        return;
+      }
+
+      // Check for local demo simulation
+      if (trimmed.toLowerCase() === 'demo' || trimmed.includes('demo:8080')) {
+        await startNetworkIpCapture({
+          ip: 'demo',
+          port: '8080',
+          protocol: 'http',
+          path: '/screen-mirror',
+          streamType: 'demo',
+          targetFps: targetFps || 60,
+          autoReconnect: true,
+          lowLatencyBuffer: true,
+          audioEnabled: false,
+          presetApp: 'demo',
+        });
+        return;
+      }
+
+      let formattedUrl = trimmed;
+      if (!/^https?:\/\//i.test(formattedUrl) && !/^wss?:\/\//i.test(formattedUrl)) {
+        if (formattedUrl.startsWith('vdo.ninja') || formattedUrl.startsWith('screenmirror')) {
+          formattedUrl = 'https://' + formattedUrl;
+        } else {
+          formattedUrl = 'http://' + formattedUrl;
+        }
+      }
+
+      // Detect if URL is a direct MJPEG / Video stream
+      const isDirectStream =
+        renderMode === 'stream' ||
+        (renderMode === 'auto' &&
+          (/\.(mjpg|mjpeg|mp4|webm|m3u8)($|\?)/i.test(formattedUrl) ||
+            /\/video($|\?)/i.test(formattedUrl) ||
+            /\/stream($|\?)/i.test(formattedUrl) ||
+            /\/live($|\?)/i.test(formattedUrl)));
+
+      if (isDirectStream) {
+        try {
+          const parsed = new URL(formattedUrl);
+          const protocol = parsed.protocol.replace(':', '') as 'http' | 'https';
+          const ip = parsed.hostname;
+          const port = parsed.port || (protocol === 'https' ? '443' : '80');
+          const path = parsed.pathname + parsed.search;
+
+          await startNetworkIpCapture({
+            ip,
+            port,
+            protocol,
+            path,
+            streamType: 'mjpeg',
+            targetFps: targetFps || 60,
+            autoReconnect: true,
+            lowLatencyBuffer: true,
+            audioEnabled: false,
+            presetApp: 'custom',
+          });
+          return;
+        } catch (e) {
+          console.warn('URL parsing failed, falling back to webview mode:', e);
+        }
+      }
+
+      // Webview Interactive Mirror Mode
+      setBrowserMirrorUrl(formattedUrl);
+      setSourceMode('browser_mirror_url');
+      setIsActive(true);
+      setIsLoading(false);
+      setError(null);
+      setTelemetry((prev) => ({
+        ...prev,
+        actualWidth: 1920,
+        actualHeight: 1080,
+        actualFps: targetFps || 60,
+        targetFps: targetFps || 60,
+        signalLocked: true,
+        lowLatencyMode: true,
+      }));
+    },
+    [stopStream, startNetworkIpCapture]
+  );
+
   // Real-time Precision Frame-to-Display Latency & Telemetry Engine
   useEffect(() => {
     if (!stream || !isActive || !videoElementRef.current) return;
@@ -818,9 +914,11 @@ export function useCaptureStream({
     telemetry,
     recordingState,
     videoElementRef,
+    browserMirrorUrl,
     startDeviceCapture,
     startRemotePlayCapture,
     startNetworkIpCapture,
+    startBrowserMirrorCapture,
     stopStream,
     captureSnapshot,
     startRecording,

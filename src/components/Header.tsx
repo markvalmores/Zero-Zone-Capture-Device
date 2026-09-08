@@ -13,6 +13,7 @@ import {
   Gauge,
   Sparkles,
   Wifi,
+  Globe,
 } from 'lucide-react';
 import { CaptureSourceMode, ConsoleType, PerformanceSettings, StreamTelemetry } from '../types';
 import { CONSOLE_PROFILES } from '../constants/presets';
@@ -28,6 +29,7 @@ interface HeaderProps {
   onOpenDetectorModal: () => void;
   onOpenGuideModal: () => void;
   onOpenIpMirrorModal: () => void;
+  onOpenBrowserMirrorModal?: () => void;
   onRescan: () => void;
   isScanning: boolean;
   activeIpAddress?: string;
@@ -44,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDetectorModal,
   onOpenGuideModal,
   onOpenIpMirrorModal,
+  onOpenBrowserMirrorModal,
   onRescan,
   isScanning,
   activeIpAddress,
@@ -133,6 +136,28 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-[#00ffcc] animate-ping" />
           )}
         </button>
+
+        {/* Browser Screen Mirror Link Button */}
+        {onOpenBrowserMirrorModal && (
+          <button
+            onClick={onOpenBrowserMirrorModal}
+            title="Paste Browser Screen Mirror Link (Screen Stream, VDO.Ninja, WebRTC, etc.)"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-all text-[10px] font-mono font-bold cursor-pointer ${
+              sourceMode === 'browser_mirror_url' && isActive
+                ? 'bg-[#00ffcc22] text-[#00ffcc] border-[#00ffcc] shadow-[0_0_10px_rgba(0,255,204,0.3)]'
+                : 'bg-[#171717] hover:bg-[#222] text-[#ddd] hover:text-[#00ffcc] border-[#333]'
+            }`}
+          >
+            <Globe
+              size={12}
+              className={sourceMode === 'browser_mirror_url' && isActive ? 'text-[#00ffcc] animate-pulse' : 'text-[#00ffcc]'}
+            />
+            <span>LINK MIRROR</span>
+            {sourceMode === 'browser_mirror_url' && isActive && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00ffcc] animate-ping" />
+            )}
+          </button>
+        )}
 
         {/* Latency Diagnostic Overlay Trigger Button */}
         <button

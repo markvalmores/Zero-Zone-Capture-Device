@@ -22,12 +22,14 @@ import { DEFAULT_NETWORK_STREAM_CONFIG, NETWORK_APP_PRESETS } from '../constants
 
 interface IpMirrorPanelProps {
   config: NetworkStreamConfig;
-  onChangeConfig: (config: NetworkStreamConfig) => void;
-  onStartNetworkCapture: (config: NetworkStreamConfig) => void;
+  onChangeConfig?: (config: NetworkStreamConfig) => void;
+  onUpdateConfig?: (config: NetworkStreamConfig) => void;
+  onStartNetworkCapture?: (config: NetworkStreamConfig) => void;
+  onStartStream?: (config: NetworkStreamConfig) => void;
   onStopStream: () => void;
   isActive: boolean;
-  isLoading: boolean;
-  sourceMode: string;
+  isLoading?: boolean;
+  sourceMode?: string;
 }
 
 const STORAGE_KEY_RECENT_IPS = 'zerozone_recent_ips';
@@ -35,11 +37,13 @@ const STORAGE_KEY_RECENT_IPS = 'zerozone_recent_ips';
 export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
   config,
   onChangeConfig,
+  onUpdateConfig,
   onStartNetworkCapture,
+  onStartStream,
   onStopStream,
   isActive,
-  isLoading,
-  sourceMode,
+  isLoading = false,
+  sourceMode = 'network_ip',
 }) => {
   const [copied, setCopied] = useState(false);
   const [pingStatus, setPingStatus] = useState<{
@@ -51,6 +55,11 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
   const [recentIps, setRecentIps] = useState<Array<{ ip: string; port: string; name: string }>>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+
+  const handleUpdate = (updated: NetworkStreamConfig) => {
+    if (typeof onChangeConfig === 'function') onChangeConfig(updated);
+    if (typeof onUpdateConfig === 'function') onUpdateConfig(updated);
+  };
 
   useEffect(() => {
     try {
@@ -85,6 +94,33 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
     config.path.startsWith('/') ? config.path : '/' + config.path
   }`;
 
+  const handlePasteFullLink = (rawInput: string) => {
+    const trimmed = rawInput.trim();
+    if (!trimmed) return;
+
+    try {
+      let candidate = trimmed;
+      if (!/^https?:\/\//i.test(candidate) && !/^wss?:\/\//i.test(candidate)) {
+        candidate = 'http://' + candidate;
+      }
+      const parsed = new URL(candidate);
+      const protocol = parsed.protocol.replace(':', '') as any;
+      const ip = parsed.hostname;
+      const port = parsed.port || (protocol === 'https' ? '443' : '80');
+      const path = parsed.pathname + (parsed.search || '');
+
+      handleUpdate({
+        ...config,
+        protocol: ['http', 'https', 'ws', 'wss'].includes(protocol) ? protocol : 'http',
+        ip,
+        port,
+        path: path && path !== '/' ? path : config.path,
+      });
+    } catch (e) {
+      handleUpdate({ ...config, ip: trimmed });
+    }
+  };
+
   const handlePresetSelect = (preset: NetworkAppPreset) => {
     const updated: NetworkStreamConfig = {
       ...config,
@@ -95,7 +131,7 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
       audioEnabled: preset.audioSupported,
       audioPath: preset.defaultAudioPath || '/audio.wav',
     };
-    onChangeConfig(updated);
+    handleUpdate(updated);
   };
 
   const handleTestPing = async () => {
@@ -162,7 +198,11 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
 
   const handleConnect = () => {
     saveRecent(config.ip, config.port, config.presetApp);
-    onStartNetworkCapture(config);
+    if (typeof onStartNetworkCapture === 'function') {
+      onStartNetworkCapture(config);
+    } else if (typeof onStartStream === 'function') {
+      onStartStream(config);
+    }
   };
 
   const isConnected = isActive && sourceMode === 'network_ip';
@@ -225,13 +265,20 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
 
         {/* IP Address Field */}
         <div>
-          <label className="text-[9px] text-[#888] uppercase block mb-1">Device IP Address</label>
+          <label className="text-[9px] text-[#888] uppercase block mb-1">Device IP Address or Full Link</label>
           <div className="flex gap-1.5">
             <input
               type="text"
               value={config.ip}
-              placeholder="192.168.1.xxx"
-              onChange={(e) => onChangeConfig({ ...config, ip: e.target.value })}
+              placeholder="192.168.1.xxx or paste full link"
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.includes('://') || (val.includes(':') && val.includes('.'))) {
+                  handlePasteFullLink(val);
+                } else {
+                  handleUpdate({ ...config, ip: val });
+                }
+              }}
               className="flex-1 bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:border-[#00ffcc] focus:outline-none"
             />
           </div>
@@ -241,21 +288,21 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            onClick={() => onChangeConfig({ ...config, ip: '192.168.1.' })}
+            onClick={() => handleUpdate({ ...config, ip: '192.168.1.' })}
             className="px-1.5 py-0.5 rounded bg-[#1e1e1e] hover:bg-[#282828] text-[#aaa] hover:text-[#00ffcc] text-[9px] border border-[#333] cursor-pointer"
           >
             192.168.1.x
           </button>
           <button
             type="button"
-            onClick={() => onChangeConfig({ ...config, ip: '192.168.0.' })}
+            onClick={() => handleUpdate({ ...config, ip: '192.168.0.' })}
             className="px-1.5 py-0.5 rounded bg-[#1e1e1e] hover:bg-[#282828] text-[#aaa] hover:text-[#00ffcc] text-[9px] border border-[#333] cursor-pointer"
           >
             192.168.0.x
           </button>
           <button
             type="button"
-            onClick={() => onChangeConfig({ ...config, ip: '127.0.0.1' })}
+            onClick={() => handleUpdate({ ...config, ip: '127.0.0.1' })}
             className="px-1.5 py-0.5 rounded bg-[#1e1e1e] hover:bg-[#282828] text-[#aaa] hover:text-[#00ffcc] text-[9px] border border-[#333] cursor-pointer"
           >
             127.0.0.1
@@ -263,7 +310,7 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
           <button
             type="button"
             onClick={() =>
-              onChangeConfig({
+              handleUpdate({
                 ...config,
                 ip: 'demo',
                 presetApp: 'demo',
@@ -285,7 +332,7 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
               type="text"
               value={config.port}
               placeholder="8080"
-              onChange={(e) => onChangeConfig({ ...config, port: e.target.value })}
+              onChange={(e) => handleUpdate({ ...config, port: e.target.value })}
               className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:border-[#00ffcc] focus:outline-none"
             />
           </div>
@@ -294,7 +341,7 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
             <label className="text-[9px] text-[#888] uppercase block mb-1">Protocol</label>
             <select
               value={config.protocol}
-              onChange={(e) => onChangeConfig({ ...config, protocol: e.target.value as any })}
+              onChange={(e) => handleUpdate({ ...config, protocol: e.target.value as any })}
               className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-2 py-1.5 text-xs text-white font-mono focus:border-[#00ffcc] focus:outline-none cursor-pointer"
             >
               <option value="http">http://</option>
@@ -385,7 +432,7 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
                 type="text"
                 value={config.path}
                 placeholder="/video"
-                onChange={(e) => onChangeConfig({ ...config, path: e.target.value })}
+                onChange={(e) => handleUpdate({ ...config, path: e.target.value })}
                 className="w-full bg-[#1a1a1a] border border-[#333] rounded px-2 py-1 text-xs text-white font-mono"
               />
             </div>
@@ -397,7 +444,7 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
                   <button
                     key={fps}
                     type="button"
-                    onClick={() => onChangeConfig({ ...config, targetFps: fps })}
+                    onClick={() => handleUpdate({ ...config, targetFps: fps })}
                     className={`py-1 text-[10px] font-bold rounded border cursor-pointer ${
                       config.targetFps === fps
                         ? 'bg-[#00ffcc22] border-[#00ffcc] text-[#00ffcc]'
@@ -418,7 +465,7 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
               <input
                 type="checkbox"
                 checked={config.audioEnabled}
-                onChange={(e) => onChangeConfig({ ...config, audioEnabled: e.target.checked })}
+                onChange={(e) => handleUpdate({ ...config, audioEnabled: e.target.checked })}
                 className="accent-[#00ffcc] cursor-pointer"
               />
             </div>
@@ -438,7 +485,7 @@ export const IpMirrorPanel: React.FC<IpMirrorPanelProps> = ({
               <button
                 key={idx}
                 type="button"
-                onClick={() => onChangeConfig({ ...config, ip: item.ip, port: item.port })}
+                onClick={() => handleUpdate({ ...config, ip: item.ip, port: item.port })}
                 className="px-2 py-0.5 rounded bg-[#1a1a1a] hover:bg-[#222] border border-[#333] text-[9px] text-[#bbb] hover:text-[#00ffcc] cursor-pointer"
               >
                 {item.ip}:{item.port}

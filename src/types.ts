@@ -11,7 +11,25 @@ export type ConsoleType =
   | 'type_c_otg'
   | 'hdmi_grabber';
 
-export type CaptureSourceMode = 'device' | 'remote_play_screen' | 'network_ip';
+export type CaptureSourceMode = 'device' | 'remote_play_screen' | 'network_ip' | 'browser_mirror_url';
+
+export interface BrowserMirrorConfig {
+  url: string;
+  renderMode: 'auto' | 'webview' | 'stream';
+  targetFps: number;
+  aspectRatio: 'contain' | 'cover' | 'fill' | '9:16' | '16:9';
+  audioEnabled: boolean;
+}
+
+export interface BrowserMirrorPreset {
+  id: string;
+  name: string;
+  defaultUrl: string;
+  category: 'mobile_app' | 'p2p_webrtc' | 'web_service' | 'demo';
+  description: string;
+  recommendedMode: 'auto' | 'webview' | 'stream';
+  badge: string;
+}
 
 export type NetworkStreamType = 'mjpeg' | 'video' | 'demo' | 'auto';
 

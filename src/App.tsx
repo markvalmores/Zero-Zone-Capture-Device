@@ -16,6 +16,7 @@ import { VideoPlayer } from './components/VideoPlayer';
 import { DeviceDetectorModal } from './components/DeviceDetectorModal';
 import { RemotePlayGuideModal } from './components/RemotePlayGuideModal';
 import { IpMirrorModal } from './components/IpMirrorModal';
+import { BrowserMirrorModal } from './components/BrowserMirrorModal';
 import { Usb, X } from 'lucide-react';
 
 export default function App() {
@@ -58,6 +59,7 @@ export default function App() {
   const [isDetectorModalOpen, setIsDetectorModalOpen] = useState(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
   const [isIpMirrorModalOpen, setIsIpMirrorModalOpen] = useState(false);
+  const [isBrowserMirrorModalOpen, setIsBrowserMirrorModalOpen] = useState(false);
 
   // Device Detector Hook
   const {
@@ -97,9 +99,11 @@ export default function App() {
     telemetry,
     recordingState,
     videoElementRef,
+    browserMirrorUrl,
     startDeviceCapture,
     startRemotePlayCapture,
     startNetworkIpCapture,
+    startBrowserMirrorCapture,
     stopStream,
     captureSnapshot,
     startRecording,
@@ -187,6 +191,7 @@ export default function App() {
         onOpenDetectorModal={() => setIsDetectorModalOpen(true)}
         onOpenGuideModal={() => setIsGuideModalOpen(true)}
         onOpenIpMirrorModal={() => setIsIpMirrorModalOpen(true)}
+        onOpenBrowserMirrorModal={() => setIsBrowserMirrorModalOpen(true)}
         onRescan={() => scanDevices(true)}
         isScanning={isScanning}
         activeIpAddress={
@@ -258,6 +263,9 @@ export default function App() {
             onStartDeviceCapture={() => startDeviceCapture()}
             onStartRemotePlayCapture={startRemotePlayCapture}
             onOpenIpMirrorModal={() => setIsIpMirrorModalOpen(true)}
+            onOpenBrowserMirrorModal={() => setIsBrowserMirrorModalOpen(true)}
+            onStartBrowserMirror={startBrowserMirrorCapture}
+            browserMirrorUrl={browserMirrorUrl}
             sourceMode={sourceMode}
             onStopStream={stopStream}
             onCaptureSnapshot={() => captureSnapshot('png')}
@@ -318,13 +326,32 @@ export default function App() {
         isOpen={isIpMirrorModalOpen}
         onClose={() => setIsIpMirrorModalOpen(false)}
         config={networkConfig}
+        currentConfig={networkConfig}
         onChangeConfig={handleUpdateNetworkConfig}
+        onUpdateConfig={handleUpdateNetworkConfig}
         onStartStream={(cfg) => {
+          startNetworkIpCapture(cfg);
+        }}
+        onStartNetworkCapture={(cfg) => {
           startNetworkIpCapture(cfg);
         }}
         onStopStream={stopStream}
         isActive={isActive && sourceMode === 'network_ip'}
         isLoading={isLoading}
+      />
+
+      {/* Browser Screen Mirror by Link Modal */}
+      <BrowserMirrorModal
+        isOpen={isBrowserMirrorModalOpen}
+        onClose={() => setIsBrowserMirrorModalOpen(false)}
+        currentUrl={browserMirrorUrl}
+        onStartBrowserMirror={(url, mode) => {
+          startBrowserMirrorCapture(url, mode);
+        }}
+        onStopStream={stopStream}
+        isActive={isActive && (sourceMode === 'browser_mirror_url' || sourceMode === 'network_ip')}
+        isLoading={isLoading}
+        sourceMode={sourceMode}
       />
     </div>
   );

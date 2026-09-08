@@ -1,4 +1,6 @@
 import {
+  BrowserMirrorConfig,
+  BrowserMirrorPreset,
   ConsoleProfileInfo,
   ConsoleType,
   CustomFilterSettings,
@@ -442,7 +444,64 @@ export const NETWORK_APP_PRESETS: NetworkAppPreset[] = [
   },
 ];
 
-// Known capture card identifiers and keywords
+// Default Browser Screen Mirror Link Configuration
+export const DEFAULT_BROWSER_MIRROR_CONFIG: BrowserMirrorConfig = {
+  url: 'http://192.168.1.100:8080',
+  renderMode: 'auto',
+  targetFps: 60,
+  aspectRatio: 'contain',
+  audioEnabled: true,
+};
+
+// Common Browser Screen Mirror Link Presets
+export const BROWSER_MIRROR_PRESETS: BrowserMirrorPreset[] = [
+  {
+    id: 'screen_stream',
+    name: 'Screen Stream over HTTP',
+    defaultUrl: 'http://192.168.1.100:8080',
+    category: 'mobile_app',
+    description: 'Broadcasts mobile screen over local Wi-Fi to any browser via HTTP/MJPEG.',
+    recommendedMode: 'auto',
+    badge: 'Android / iOS',
+  },
+  {
+    id: 'vdo_ninja',
+    name: 'VDO.Ninja Screen Share',
+    defaultUrl: 'https://vdo.ninja/?view=zerozone_mirror',
+    category: 'p2p_webrtc',
+    description: 'P2P ultra-low latency WebRTC browser screen mirror. Share screen from any device directly.',
+    recommendedMode: 'webview',
+    badge: 'Ultra-Low Latency',
+  },
+  {
+    id: 'ip_webcam',
+    name: 'IP Webcam Video Stream',
+    defaultUrl: 'http://192.168.1.100:8080/video',
+    category: 'mobile_app',
+    description: 'Direct video stream URL from IP Webcam app.',
+    recommendedMode: 'stream',
+    badge: 'Direct Stream',
+  },
+  {
+    id: 'scrcpy_web',
+    name: 'Scrcpy Web / WS Mirror',
+    defaultUrl: 'http://localhost:8000',
+    category: 'web_service',
+    description: 'Web-based USB/ADB Android screen mirror running on local computer port 8000.',
+    recommendedMode: 'webview',
+    badge: 'PC / USB Relay',
+  },
+  {
+    id: 'live_demo',
+    name: 'Live Screen Mirror Simulation (Demo)',
+    defaultUrl: 'http://demo:8080/screen-mirror',
+    category: 'demo',
+    description: 'Zero-hardware interactive simulated mobile screen mirror for testing.',
+    recommendedMode: 'auto',
+    badge: 'Instant Demo',
+  },
+];
+
 export const CAPTURE_CARD_KEYWORDS = [
   'capture',
   'cam link',
